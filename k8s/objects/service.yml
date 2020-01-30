@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: gitlab-ci-cd-k8s-project-service
+spec:
+  selector:
+    app: gitlab-ci-cd-k8s-project
+  ports:
+    - name: tomcat-http
+      protocol: TCP
+      port: 8080
+      targetPort: 8080
+    - name: tomcat-remote-debug
+      protocol: TCP
+      port: 8000
+      targetPort: 8000
+  type: ClusterIP

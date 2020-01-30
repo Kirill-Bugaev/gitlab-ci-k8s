@@ -1,0 +1,13 @@
+[[runners]]
+  [runners.kubernetes]
+    privileged = true
+    namespace = "gitlab"
+    namespace_overwrite_allowed = ".*"
+    service_account_overwrite_allowed = ".*"
+    [[runners.kubernetes.volumes.pvc]]
+      name = "maven-repository"
+      mount_path = "/root/.m2/repository"
+
+---
+
+\ /entrypoint register --template-config /scripts/config.template.toml \\\n    --non-interactive\n\n

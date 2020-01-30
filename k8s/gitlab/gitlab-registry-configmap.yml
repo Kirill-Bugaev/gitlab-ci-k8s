@@ -1,0 +1,4 @@
+    auth:
+      token:
+        realm: http://10.96.247.231:8181/jwt/auth
+        service: container_registry

@@ -1,0 +1,13 @@
+# add to gitlab-gitlab-runner ConfigMap
+
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: maven-repository
+spec:
+  accessModes:
+    - ReadWriteMany
+  volumeMode: Filesystem
+  resources:
+    requests:
+      storage: 5Gi

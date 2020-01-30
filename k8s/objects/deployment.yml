@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gitlab-ci-cd-k8s-project-deployment
+  labels:
+    app: gitlab-ci-cd-k8s-project
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gitlab-ci-cd-k8s-project
+  template:
+    metadata:
+      labels:
+        app: gitlab-ci-cd-k8s-project
+    spec:
+      containers:
+      - name: gitlab-ci-cd-k8s-project
+        image: "gitlab-registry:5000/kirill-bugaev/gitlab-ci-cd-k8s:latest"
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+        - containerPort: 8000

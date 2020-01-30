@@ -1,0 +1,93 @@
+.maven_image: &maven_image
+  # if gitlab-runner runs in other namespace than docker-registry
+  # should specify namespace: docker-registry.docker-registry-namespace:5000
+  image: docker-registry:5000/maven:3.3-jdk-8-alpine-scripts
+
+variables:
+  CI_REGISTRY: "gitlab-registry:5000"
+  CI_REGISTRY_IMAGE: "gitlab-registry:5000/kirill-bugaev/gitlab-ci-cd-k8s"
+
+stages:
+  - test
+  - compile
+  - build
+  - release
+  - deploy
+
+test:
+  stage: test
+  <<: *maven_image
+  script:
+    - mvn compiler:testCompile
+    - mvn surefire:test
+
+compile:
+  stage: compile
+  <<: *maven_image
+  script:
+    - mvn compiler:compile
+    - echo $CI_JOB_ID > compile_job_id
+  artifacts:
+    paths:
+      - target
+      - compile_job_id
+
+build:
+  stage: build
+  dependencies:
+    - compile
+  <<: *maven_image
+  script:
+    - mvn war:war
+    - echo $CI_JOB_ID > build_job_id
+  # clean compile artifacts
+  after_script:
+    - COMPILE_JOB_ID=$(cat compile_job_id)
+    - /scripts/remove_artifacts.sh $CI_PROJECT_ID $COMPILE_JOB_ID
+  artifacts:
+    paths:
+      - target/gitlabCiCdK8s.war
+      - build_job_id
+
+build docker image:
+  stage: release
+  dependencies:
+    - build
+#  image: docker-registry:5000/kaniko:debug
+#  script:
+#    - |
+#      echo "FROM docker-registry:5000/tomcat:9.0.30-jdk8-openjdk-slim
+#      COPY target/gitlabCiCdK8s.war /webapps/" > Dockerfile
+#    - cat Dockerfile
+#    - |
+#      echo "{\"auths\":{\"gitlab-registry:5000\":{\"username\":\"$CI_REGISTRY_USER\"," \
+#      "\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > /kaniko/.docker/config.json
+#    - cat /kaniko/.docker/config.json
+#    - |
+#      /kaniko/executor --insecure-pull --insecure --skip-tls-verify --dockerfile Dockerfile \
+#       --context "$CI_PROJECT_DIR" --destination gitlab-registry:5000/kirill-bugaev/gitlab-ci-cd-k8s:latest
+  image:
+    name: docker-registry:5000/docker:latest
+  variables:
+    DOCKER_HOST: "tcp://localhost:2375"
+  services:
+    - name: docker-registry:5000/docker:dind
+  script:
+    - |
+      echo "FROM docker-registry:5000/tomcat:9.0.30-jdk8-openjdk-slim
+      COPY target/gitlabCiCdK8s.war /usr/local/tomcat/webapps/" > Dockerfile
+    - docker image build -t "${CI_REGISTRY_IMAGE}":latest .
+    - docker login -u "${CI_REGISTRY_USER}" -p "${CI_REGISTRY_PASSWORD}" "${CI_REGISTRY}"
+    - docker push "${CI_REGISTRY_IMAGE}":latest
+  # clean build artifacts
+  after_script:
+    - BUILD_JOB_ID=$(cat build_job_id)
+    - /scripts/remove_artifacts.sh $CI_PROJECT_ID $BUILD_JOB_ID
+
+deploy:
+  stage: deploy
+  image: docker-registry:5000/lachlanevenson/k8s-kubectl:latest
+  variables:
+    KUBERNETES_SERVICE_ACCOUNT_OVERWRITE: gitlab-ci
+  script:
+    - kubectl rollout restart deployment gitlab-ci-cd-k8s-project-deployment
